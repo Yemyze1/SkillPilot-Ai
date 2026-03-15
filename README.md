@@ -84,9 +84,21 @@ Example:
 
 ```
 /screenshots/dashboard.png
+    
+
 /screenshots/project-generator.png
 ```
+Ask Ai
+![alt text](<screenshot ask ai-1.png>)
+```
 
+Screenshot history
+3mtt Ai project/screenshot history.png
+```
+
+Example
+what is html
+![alt text](<screenshot what is html-1.png>)
 ---
 
 ## 🚀 How to Run the Project
