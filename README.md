@@ -69,10 +69,11 @@ into a **single dashboard.**
 
 ## 🛠️ Built With
 
-- HTML
+- HTML 
 - CSS
 - JavaScript
 - AI API integration
+and pwered by claude Ai
 
 ---
 

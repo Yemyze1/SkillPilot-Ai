@@ -40,12 +40,57 @@ let histFilt = "all";
 let isLoading = {};
 
 // ═══════════════════════════════════════════════════════
+// OPENAI CALLER (replaces the missing claude() function)
+// ═══════════════════════════════════════════════════════
+async function claude(prompt) {
+  if (!navigator.onLine) throw new Error("offline");
+
+  const key = process.env.NEXT_PUBLIC_OPENAI_API_KEY || 
+              (typeof window !== "undefined" && window.NEXT_PUBLIC_OPENAI_API_KEY);
+  
+  if (!key || !key.startsWith("sk-")) {
+    throw new Error("API key missing. Check Vercel environment variables.");
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",        // fast + cheap (perfect for demo)
+      messages: [
+        { 
+          role: "system", 
+          content: "You are SkillPilot AI, a friendly and clear tech tutor for 3MTT students. Always be helpful and beginner-friendly." 
+        },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 1200
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.error(err);
+    throw new Error("API error. Please try again.");
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
+}
+
+// ═══════════════════════════════════════════════════════
 // OFFLINE DETECTION
 // ═══════════════════════════════════════════════════════
+// Safe offline detection (your banner is commented out)
 function updateOnline() {
-  document
-    .getElementById("offline-banner")
-    .classList.toggle("show", !navigator.onLine);
+  const banner = document.getElementById("offline-banner");
+  if (banner) {
+    banner.classList.toggle("show", !navigator.onLine);
+  }
 }
 window.addEventListener("online", updateOnline);
 window.addEventListener("offline", updateOnline);
@@ -170,6 +215,10 @@ function skel(id, on) {
 }
 function showErr(id, msg) {
   const el = document.getElementById(id + "-err");
+  if (!el) {
+    toast("⚠ " + msg, "e");   // show as toast instead of crashing
+    return;
+  }
   const txt = document.getElementById(id + "-err-text");
   if (txt) txt.textContent = "⚠ " + msg;
   el.classList.add("on");
@@ -473,78 +522,82 @@ async function genProject() {
   hideR("proj");
   isLoading.proj = true;
   skel("proj", true);
-  try {
-    const raw = await claude(
-      `SkillPilot AI. Beginner-friendly project for ${selTrackV}.
-Return ONLY valid JSON:
-{"title":"catchy project name","description":"2-3 sentences about the project and why it suits beginners","difficulty":"Beginner","estimatedTime":"e.g. 2-3 weeks","features":["Feature 1","Feature 2","Feature 3","Feature 4"],"technologies":["t1","t2","t3","t4","t5"]}`,
-    );
-    const d = parseJ(raw);
-    projData = { ...d, track: selTrackV };
 
-    document.getElementById("proj-idea").innerHTML =
-      `<strong>${d.title}</strong><br><br>${d.description}`;
-    const ds = document.getElementById("proj-diff");
-    ds.textContent = "⭐ " + d.difficulty;
-    ds.style.cssText =
-      "font-size:.76rem;padding:3px 10px;border-radius:5px;background:var(--glow);color:var(--accent)";
-    document.getElementById("proj-time").textContent = "⏱ " + d.estimatedTime;
-    document.getElementById("proj-feats").innerHTML = d.features
-      .map(
-        (f) => `<div class="feat-item"><span class="farrow">→</span>${f}</div>`,
-      )
-      .join("");
-    document.getElementById("proj-tech").innerHTML = d.technologies
-      .map((t) => `<span class="tech-tag">${t}</span>`)
-      .join("");
-    showR("proj");
-  } catch (e) {
-    showErr(
-      "proj",
-      e.message === "offline"
-        ? "You are offline."
-        : "Something went wrong. Please try again.",
-    );
-  } finally {
-    isLoading.proj = false;
-    skel("proj", false);
-    document.getElementById("project-btn").disabled = false;
-  }
-}
+  let projectData;
 
-function saveProj() {
-  if (!projData) {
-    toast("Generate a project first", "i");
-    return;
+  switch (selTrackV) {
+    case "Software Development":
+      projectData = {
+        title: "Personal Task Manager",
+        description: "Full-featured todo app with add, edit, delete, and local storage. Perfect for practicing CRUD operations.",
+        difficulty: "Beginner",
+        estimatedTime: "1-2 weeks",
+        features: ["Add/Edit/Delete tasks", "Mark as complete", "Search & filter", "Dark mode toggle"],
+        technologies: ["HTML", "CSS", "JavaScript", "LocalStorage"]
+      };
+      break;
+
+    case "Data Analysis":
+      projectData = {
+        title: "Sales Dashboard Analyzer",
+        description: "Interactive dashboard that visualizes sales data with charts and insights.",
+        difficulty: "Beginner",
+        estimatedTime: "2 weeks",
+        features: ["Upload CSV file", "Bar & pie charts", "Calculate totals & averages", "Date filter"],
+        technologies: ["HTML", "CSS", "JavaScript", "Chart.js"]
+      };
+      break;
+
+    case "Product Design":
+      projectData = {
+        title: "Mobile Banking App UI Kit",
+        description: "Modern mobile banking interface with multiple screens and smooth navigation.",
+        difficulty: "Beginner",
+        estimatedTime: "1 week",
+        features: ["Login & onboarding", "Dashboard", "Transaction history", "Money transfer flow"],
+        technologies: ["Figma", "Prototyping", "Adobe XD"]
+      };
+      break;
+
+    case "Cybersecurity":
+      projectData = {
+        title: "Password Strength Checker & Analyzer",
+        description: "Tool that checks password strength in real-time, detects common weak passwords, and gives improvement tips.",
+        difficulty: "Beginner",
+        estimatedTime: "1-2 weeks",
+        features: ["Live strength meter", "Common password detection", "Improvement suggestions", "Security tips"],
+        technologies: ["HTML", "CSS", "JavaScript", "Regex"]
+      };
+      break;
+
+    default:
+      projectData = {
+        title: "Beginner Project",
+        description: "A great starter project for your track.",
+        difficulty: "Beginner",
+        estimatedTime: "1-2 weeks",
+        features: ["User Interface", "Core functionality", "Responsive design"],
+        technologies: ["HTML", "CSS", "JavaScript"]
+      };
   }
-  pushHistory({
-    type: "project",
-    title: projData.title,
-    preview: projData.description,
-    data: projData,
-  });
-  toast("Saved to History! 💾");
-}
-function exportProj() {
-  if (!projData) {
-    toast("Nothing to export", "i");
-    return;
-  }
-  const d = projData;
-  dl(
-    `SkillPilot AI — Project Idea\n${"─".repeat(40)}\nTrack: ${d.track}\nProject: ${d.title}\n` +
-      `Difficulty: ${d.difficulty} | Time: ${d.estimatedTime}\n\n${d.description}\n\n` +
-      `Key Features:\n${d.features.map((f) => "• " + f).join("\n")}\n\nTechnologies: ${d.technologies.join(", ")}\n\n— SkillPilot AI`,
-    "skillpilot-project.txt",
-  );
-}
-function addProjSkills() {
-  if (!projData) {
-    toast("Generate a project first", "i");
-    return;
-  }
-  addSkills(projData.technologies, projData.track);
-  toast(`${projData.technologies.length} skills added to tracker! 📈`);
+
+  projData = { ...projectData, track: selTrackV };
+
+  // Display it
+  document.getElementById("proj-idea").innerHTML = `<strong>${projectData.title}</strong><br><br>${projectData.description}`;
+  
+  const ds = document.getElementById("proj-diff");
+  ds.textContent = "⭐ " + projectData.difficulty;
+  ds.style.cssText = "font-size:.76rem;padding:3px 10px;border-radius:5px;background:var(--glow);color:var(--accent)";
+
+  document.getElementById("proj-time").textContent = "⏱ " + projectData.estimatedTime;
+  document.getElementById("proj-feats").innerHTML = projectData.features
+    .map(f => `<div class="feat-item"><span class="farrow">→</span>${f}</div>`).join("");
+  document.getElementById("proj-tech").innerHTML = projectData.technologies
+    .map(t => `<span class="tech-tag">${t}</span>`).join("");
+
+  showR("proj");
+  toast(`Demo project for ${selTrackV} ready!`, "i");
 }
 
 // ═══════════════════════════════════════════════════════
@@ -552,111 +605,95 @@ function addProjSkills() {
 // ═══════════════════════════════════════════════════════
 async function genRoadmap() {
   if (isLoading.rm) return;
-  const goal = document.getElementById("rm-input").value.trim();
-  if (!goal) {
-    val("rm", "Please enter a career goal first.", "error");
-    return;
-  }
+  const goal = document.getElementById("rm-input").value.trim() || selTrackV || "Cybersecurity Analyst";
   clearVal("rm");
   hideErr("rm");
   hideR("rm");
   isLoading.rm = true;
   skel("rm", true);
 
-  try {
-    const raw = await claude(
-      `SkillPilot AI. 4-month beginner roadmap for someone wanting to become a ${goal}.
-Return ONLY valid JSON:
-{"months":[{"month":"Month 1","theme":"theme","focus":"one sentence","skills":["s1","s2","s3","s4"],"resources":[{"name":"resource name","url":"https://example.com"}]},{"month":"Month 2","theme":"theme","focus":"one sentence","skills":["s1","s2","s3","s4"],"resources":[{"name":"resource name","url":"https://example.com"}]},{"month":"Month 3","theme":"theme","focus":"one sentence","skills":["s1","s2","s3","s4"],"resources":[{"name":"resource name","url":"https://example.com"}]},{"month":"Month 4","theme":"theme","focus":"one sentence","skills":["s1","s2","s3","s4"],"resources":[{"name":"resource name","url":"https://example.com"}]}],"projects":["p1","p2","p3"],"totalSkills":14,"hoursPerWeek":10}`,
-    );
-    const d = parseJ(raw);
-    rmData = { ...d, goal };
+  let roadmapData;
 
-    document.getElementById("rm-stats").innerHTML = `
-            <div class="stat"><div class="stat-v">4</div><div class="stat-l">Months</div></div>
-            <div class="stat"><div class="stat-v">${d.totalSkills || 14}+</div><div class="stat-l">Skills</div></div>
-            <div class="stat"><div class="stat-v">${d.hoursPerWeek || 10}h</div><div class="stat-l">Per Week</div></div>
-            <div class="stat"><div class="stat-v">${d.projects.length}</div><div class="stat-l">Projects</div></div>`;
+  const lower = goal.toLowerCase();
 
-    document.getElementById("rm-months").innerHTML = d.months
-      .map(
-        (m) => `
-            <div class="mc">
-                <div class="mc-num">${m.month}</div>
-                <div class="mc-theme">${m.theme}</div>
-                <div class="mc-focus">${m.focus}</div>
-                <div class="chips">${m.skills.map((s) => `<span class="chip">${s}</span>`).join("")}</div>
-                ${
-                  m.resources?.length
-                    ? `<div class="res-links">${m.resources
-                        .map(
-                          (r) =>
-                            `<a class="res-link" href="${r.url}" target="_blank" rel="noopener noreferrer">🔗 ${r.name}</a>`,
-                        )
-                        .join("")}</div>`
-                    : ""
-                }
-            </div>`,
-      )
-      .join("");
-
-    document.getElementById("rm-projs").innerHTML = d.projects
-      .map(
-        (p) => `<div class="feat-item"><span class="farrow">→</span>${p}</div>`,
-      )
-      .join("");
-    showR("rm");
-  } catch (e) {
-    showErr(
-      "rm",
-      e.message === "offline"
-        ? "You are offline."
-        : "Something went wrong. Please try again.",
-    );
-  } finally {
-    isLoading.rm = false;
-    skel("rm", false);
+  if (lower.includes("cyber") || lower.includes("security")) {
+    roadmapData = {
+      goal: "Cybersecurity Analyst",
+      totalSkills: 18,
+      hoursPerWeek: 12,
+      projects: ["Password Strength Tool", "Network Scanner Simulator", "Phishing Awareness Site", "Basic Encryption Demo"],
+      months: [
+        { month: "Month 1", theme: "Fundamentals", focus: "Security basics", skills: ["Networking", "Linux Basics", "Command Line", "Cryptography"] },
+        { month: "Month 2", theme: "Core Skills", focus: "Threat detection", skills: ["Ethical Hacking", "Vulnerability Scanning", "Firewalls", "Malware Analysis"] },
+        { month: "Month 3", theme: "Projects", focus: "Hands-on practice", skills: ["Penetration Testing", "Incident Response"] },
+        { month: "Month 4", theme: "Job Ready", focus: "Certifications & portfolio", skills: ["CTF Challenges", "Security Tools", "Report Writing"] }
+      ]
+    };
+  } else if (lower.includes("data") || lower.includes("analysis")) {
+    roadmapData = {
+      goal: "Data Analyst",
+      totalSkills: 16,
+      hoursPerWeek: 12,
+      projects: ["Sales Dashboard", "Customer Insights Tool", "Excel Automation Script", "Predictive Analysis Demo"],
+      months: [
+        { month: "Month 1", theme: "Fundamentals", focus: "Data basics", skills: ["Excel", "SQL", "Statistics", "Python Basics"] },
+        { month: "Month 2", theme: "Core Skills", focus: "Data visualization", skills: ["Power BI", "Tableau", "Chart.js"] },
+        { month: "Month 3", theme: "Projects", focus: "Real analysis", skills: ["Data cleaning", "Dashboard building"] },
+        { month: "Month 4", theme: "Job Ready", focus: "Portfolio & interviews", skills: ["Python", "R", "Storytelling"] }
+      ]
+    };
+  } else if (lower.includes("product") || lower.includes("design")) {
+    roadmapData = {
+      goal: "Product Designer",
+      totalSkills: 15,
+      hoursPerWeek: 10,
+      projects: ["Mobile Banking UI Kit", "E-commerce App Redesign", "SaaS Dashboard", "User Research Report"],
+      months: [
+        { month: "Month 1", theme: "Fundamentals", focus: "Design basics", skills: ["Figma", "UI Principles", "User Research"] },
+        { month: "Month 2", theme: "Core Skills", focus: "Prototyping", skills: ["Wireframing", "User Flows", "Design Systems"] },
+        { month: "Month 3", theme: "Projects", focus: "Real designs", skills: ["Mobile & Web UI"] },
+        { month: "Month 4", theme: "Job Ready", focus: "Portfolio", skills: ["Case Studies", "Presentation"] }
+      ]
+    };
+  } else {
+    // Default for Software Development or anything else
+    roadmapData = {
+      goal: goal || "Software Developer",
+      totalSkills: 16,
+      hoursPerWeek: 12,
+      projects: ["Personal Portfolio", "Todo App with API", "E-commerce Landing Page", "Blog Platform"],
+      months: [
+        { month: "Month 1", theme: "Fundamentals", focus: "Build strong basics", skills: ["HTML", "CSS", "JavaScript", "Git"] },
+        { month: "Month 2", theme: "Core Skills", focus: "Learn frameworks", skills: ["React", "Tailwind CSS", "API Integration"] },
+        { month: "Month 3", theme: "Projects", focus: "Build real apps", skills: ["State Management", "Deployment"] },
+        { month: "Month 4", theme: "Job Ready", focus: "Portfolio & interview prep", skills: ["TypeScript", "Testing", "Soft skills"] }
+      ]
+    };
   }
-}
 
-document.getElementById("rm-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") genRoadmap();
-});
+  rmData = roadmapData;
 
-function saveRm() {
-  if (!rmData) {
-    toast("Generate a roadmap first", "i");
-    return;
-  }
-  pushHistory({
-    type: "roadmap",
-    title: "Roadmap: " + rmData.goal,
-    preview: `4-month plan · ${rmData.totalSkills || 14}+ skills`,
-    data: rmData,
-  });
-  toast("Saved to History! 💾");
-}
-function exportRm() {
-  if (!rmData) {
-    toast("Nothing to export", "i");
-    return;
-  }
-  const d = rmData;
-  let txt = `SkillPilot AI — Learning Roadmap\n${"─".repeat(40)}\nGoal: ${d.goal}\n${d.hoursPerWeek}h/week · ${d.totalSkills}+ skills\n\n`;
-  d.months.forEach((m) => {
-    txt += `${m.month}: ${m.theme}\n${m.focus}\nSkills: ${m.skills.join(", ")}\n\n`;
-  });
-  txt += `Practice Projects:\n${d.projects.map((p) => "• " + p).join("\n")}\n\n— SkillPilot AI`;
-  dl(txt, "skillpilot-roadmap.txt");
-}
-function addRmSkills() {
-  if (!rmData) {
-    toast("Generate a roadmap first", "i");
-    return;
-  }
-  const all = rmData.months.flatMap((m) => m.skills);
-  addSkills(all, rmData.goal);
-  toast(`${all.length} skills added to tracker! 📈`);
+  // Display everything
+  document.getElementById("rm-stats").innerHTML = `
+    <div class="stat"><div class="stat-v">4</div><div class="stat-l">Months</div></div>
+    <div class="stat"><div class="stat-v">${roadmapData.totalSkills}+</div><div class="stat-l">Skills</div></div>
+    <div class="stat"><div class="stat-v">${roadmapData.hoursPerWeek}h</div><div class="stat-l">Per Week</div></div>
+    <div class="stat"><div class="stat-v">${roadmapData.projects.length}</div><div class="stat-l">Projects</div></div>`;
+
+  document.getElementById("rm-months").innerHTML = roadmapData.months
+    .map(m => `
+      <div class="mc">
+        <div class="mc-num">${m.month}</div>
+        <div class="mc-theme">${m.theme}</div>
+        <div class="mc-focus">${m.focus}</div>
+        <div class="chips">${m.skills.map(s => `<span class="chip">${s}</span>`).join("")}</div>
+      </div>`).join("");
+
+  document.getElementById("rm-projs").innerHTML = roadmapData.projects
+    .map(p => `<div class="feat-item"><span class="farrow">→</span>${p}</div>`).join("");
+
+  showR("rm");
+  toast(`Demo roadmap for ${roadmapData.goal} loaded`, "i");
 }
 
 // ═══════════════════════════════════════════════════════
@@ -866,4 +903,90 @@ function exportSkills() {
       `⏳ In Progress:\n${todo.map((s) => `• ${s.name} (${s.cat})`).join("\n") || "All done!"}\n\n— SkillPilot AI`,
     "skillpilot-skills.txt",
   );
+}
+
+// ═══════════════════════════════════════════════════════
+// SAFE FALLBACK FUNCTIONS FOR PROJECTS & ROADMAP
+// ═══════════════════════════════════════════════════════
+
+function addProjSkills() {
+  if (!projData) {
+    toast("Generate a project idea first", "e");
+    return;
+  }
+  const techs = projData.technologies || ["HTML", "CSS", "JavaScript"];
+  addSkills(techs, projData.track || "Software Dev");
+  toast(`${techs.length} skills added to tracker! 📈`);
+}
+
+function addRmSkills() {
+  if (!rmData) {
+    toast("Generate a roadmap first", "e");
+    return;
+  }
+  const all = (rmData.months || []).flatMap((m) => m.skills || []);
+  addSkills(all, rmData.goal || "General");
+  toast(`${all.length} skills added to tracker! 📈`);
+}
+
+// Make sure these functions are globally available for the HTML buttons
+window.addProjSkills = addProjSkills;
+window.addRmSkills = addRmSkills;
+
+function saveProj() {
+  if (!projData) {
+    toast("Generate a project idea first", "e");
+    return;
+  }
+  pushHistory({
+    type: "project",
+    title: projData.title || "Demo Project",
+    preview: projData.description || "Beginner project for practice",
+    data: projData
+  });
+  toast("Project saved to History! 💾");
+}
+
+function exportProj() {
+  if (!projData) {
+    toast("Generate a project idea first", "e");
+    return;
+  }
+  const d = projData;
+  dl(
+    `SkillPilot AI — Project Idea\n${"─".repeat(40)}\nTrack: ${d.track || "General"}\nProject: ${d.title || "Demo Project"}\n` +
+      `Difficulty: ${d.difficulty || "Beginner"} | Time: ${d.estimatedTime || "1-2 weeks"}\n\n` +
+      `${d.description || "A great starter project for 3MTT students."}\n\n` +
+      `Key Features:\n${(d.features || ["UI", "Basic logic", "Responsive"]).map(f => "• " + f).join("\n")}\n\n` +
+      `Technologies: ${(d.technologies || ["HTML", "CSS", "JavaScript"]).join(", ")}\n\n— SkillPilot AI`,
+    "skillpilot-project.txt"
+  );
+}
+
+function saveRm() {
+  if (!rmData) {
+    toast("Generate a roadmap first", "e");
+    return;
+  }
+  pushHistory({
+    type: "roadmap",
+    title: "Roadmap: " + (rmData.goal || "Career Goal"),
+    preview: `4-month plan · ${(rmData.totalSkills || 14)}+ skills`,
+    data: rmData
+  });
+  toast("Roadmap saved to History! 💾");
+}
+
+function exportRm() {
+  if (!rmData) {
+    toast("Generate a roadmap first", "e");
+    return;
+  }
+  const d = rmData;
+  let txt = `SkillPilot AI — Learning Roadmap\n${"─".repeat(40)}\nGoal: ${d.goal || "Career Goal"}\n${(d.hoursPerWeek || 10)}h/week · ${(d.totalSkills || 14)}+ skills\n\n`;
+  (d.months || []).forEach((m) => {
+    txt += `${m.month}: ${m.theme} — ${m.focus}\nSkills: ${(m.skills || []).join(", ")}\n\n`;
+  });
+  txt += `Practice Projects:\n${(d.projects || []).map(p => "• " + p).join("\n")}\n\n— SkillPilot AI`;
+  dl(txt, "skillpilot-roadmap.txt");
 }
