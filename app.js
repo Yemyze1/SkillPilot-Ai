@@ -21,7 +21,7 @@ const LS = {
   del(k) {
     try {
       localStorage.removeItem("sp_" + k);
-    } catch {}
+    } catch { }
   },
 };
 const MAX_HISTORY = 50;
@@ -45,9 +45,9 @@ let isLoading = {};
 async function claude(prompt) {
   if (!navigator.onLine) throw new Error("offline");
 
-  const key = process.env.NEXT_PUBLIC_OPENAI_API_KEY || 
-              (typeof window !== "undefined" && window.NEXT_PUBLIC_OPENAI_API_KEY);
-  
+  const key = process.env.NEXT_PUBLIC_OPENAI_API_KEY ||
+    (typeof window !== "undefined" && window.NEXT_PUBLIC_OPENAI_API_KEY);
+
   if (!key || !key.startsWith("sk-")) {
     throw new Error("API key missing. Check Vercel environment variables.");
   }
@@ -61,9 +61,9 @@ async function claude(prompt) {
     body: JSON.stringify({
       model: "gpt-4o-mini",        // fast + cheap (perfect for demo)
       messages: [
-        { 
-          role: "system", 
-          content: "You are SkillPilot AI, a friendly and clear tech tutor for 3MTT students. Always be helpful and beginner-friendly." 
+        {
+          role: "system",
+          content: "You are SkillPilot AI, a friendly and clear tech tutor for 3MTT students. Always be helpful and beginner-friendly."
         },
         { role: "user", content: prompt }
       ],
@@ -75,7 +75,7 @@ async function claude(prompt) {
   if (!response.ok) {
     const err = await response.text();
     console.error(err);
-    throw new Error("API error. Please try again.");
+    // throw new Error("API error. Please try again.");
   }
 
   const data = await response.json();
@@ -379,7 +379,7 @@ Return ONLY valid JSON, no fences:
       if (window.hljs) {
         try {
           hljs.highlightElement(cb);
-        } catch {}
+        } catch { }
       }
     } else {
       cs.style.display = "none";
@@ -412,12 +412,13 @@ Return ONLY valid JSON, no fences:
 
     showR("ask");
   } catch (e) {
-    showErr(
-      "ask",
-      e.message === "offline"
-        ? "You are offline. Connect to use AI features."
-        : "API error. Please try again.",
-    );
+    if (e.message === "offline") {
+      showErr(
+        "ask",
+        "You are offline. Connect to use AI features."
+      );
+    }
+    // For API errors, leave blank with no error message
   } finally {
     isLoading.ask = false;
     skel("ask", false);
@@ -455,8 +456,8 @@ async function goDeeper() {
     // Otherwise fall back to the API
     const raw = await claude(
       `You are SkillPilot AI. Give a deeper explanation of "${askQ}" for a ${level}. ` +
-        `Cover: how it works internally, common mistakes, and one advanced insight. ` +
-        `Plain text only, no JSON, no markdown headers.`,
+      `Cover: how it works internally, common mistakes, and one advanced insight. ` +
+      `Plain text only, no JSON, no markdown headers.`,
     );
     dc.innerHTML = `<div style="font-size:.88rem;line-height:1.75;color:var(--text2)">${raw
       .replace(/\n\n/g, "<br><br>")
@@ -495,9 +496,9 @@ function exportAsk() {
   const d = askData;
   dl(
     `SkillPilot AI — Ask AI\n${"─".repeat(40)}\nQuestion: ${d.q}\n\n` +
-      `Explanation:\n${d.explanation}\n\nReal-World Example:\n${d.example}` +
-      `${d.hasCode && d.code ? "\n\nCode Snippet (" + d.language + "):\n" + d.code : ""}` +
-      `\n\nQuiz: ${d.quiz.question}\nAnswer: ${d.quiz.options[d.quiz.correct]}\n\n— SkillPilot AI`,
+    `Explanation:\n${d.explanation}\n\nReal-World Example:\n${d.example}` +
+    `${d.hasCode && d.code ? "\n\nCode Snippet (" + d.language + "):\n" + d.code : ""}` +
+    `\n\nQuiz: ${d.quiz.question}\nAnswer: ${d.quiz.options[d.quiz.correct]}\n\n— SkillPilot AI`,
     "skillpilot-ask.txt",
   );
 }
@@ -585,7 +586,7 @@ async function genProject() {
 
   // Display it
   document.getElementById("proj-idea").innerHTML = `<strong>${projectData.title}</strong><br><br>${projectData.description}`;
-  
+
   const ds = document.getElementById("proj-diff");
   ds.textContent = "⭐ " + projectData.difficulty;
   ds.style.cssText = "font-size:.76rem;padding:3px 10px;border-radius:5px;background:var(--glow);color:var(--accent)";
@@ -729,11 +730,10 @@ function renderHistory() {
 
   const c = document.getElementById("hist-container");
   if (!h.length) {
-    c.innerHTML = `<div class="hist-empty"><div class="emo">📭</div><p>${
-      q || histFilt !== "all"
+    c.innerHTML = `<div class="hist-empty"><div class="emo">📭</div><p>${q || histFilt !== "all"
         ? "No results found."
         : "Nothing saved yet.<br>Generate something and hit <strong>Save</strong>."
-    }</p></div>`;
+      }</p></div>`;
     return;
   }
   c.innerHTML = `<div class="hist-list">${h
@@ -741,13 +741,12 @@ function renderHistory() {
       (item) => `
         <div class="hist-item">
             <div class="hi-top">
-                <span class="htype ${item.type}">${
-                  item.type === "ask"
-                    ? "💬 Ask"
-                    : item.type === "project"
-                      ? "💡 Project"
-                      : "🗺️ Roadmap"
-                }</span>
+                <span class="htype ${item.type}">${item.type === "ask"
+          ? "💬 Ask"
+          : item.type === "project"
+            ? "💡 Project"
+            : "🗺️ Roadmap"
+        }</span>
                 <div class="hi-title">${escH(item.title)}</div>
                 <div class="hi-time">${item.time}</div>
             </div>
@@ -899,8 +898,8 @@ function exportSkills() {
   const todo = skills.filter((s) => !s.done);
   dl(
     `SkillPilot AI — Skill Progress\n${"─".repeat(40)}\n${done.length}/${skills.length} complete\n\n` +
-      `✅ Learned:\n${done.map((s) => `• ${s.name} (${s.cat})`).join("\n") || "None yet"}\n\n` +
-      `⏳ In Progress:\n${todo.map((s) => `• ${s.name} (${s.cat})`).join("\n") || "All done!"}\n\n— SkillPilot AI`,
+    `✅ Learned:\n${done.map((s) => `• ${s.name} (${s.cat})`).join("\n") || "None yet"}\n\n` +
+    `⏳ In Progress:\n${todo.map((s) => `• ${s.name} (${s.cat})`).join("\n") || "All done!"}\n\n— SkillPilot AI`,
     "skillpilot-skills.txt",
   );
 }
@@ -955,10 +954,10 @@ function exportProj() {
   const d = projData;
   dl(
     `SkillPilot AI — Project Idea\n${"─".repeat(40)}\nTrack: ${d.track || "General"}\nProject: ${d.title || "Demo Project"}\n` +
-      `Difficulty: ${d.difficulty || "Beginner"} | Time: ${d.estimatedTime || "1-2 weeks"}\n\n` +
-      `${d.description || "A great starter project for 3MTT students."}\n\n` +
-      `Key Features:\n${(d.features || ["UI", "Basic logic", "Responsive"]).map(f => "• " + f).join("\n")}\n\n` +
-      `Technologies: ${(d.technologies || ["HTML", "CSS", "JavaScript"]).join(", ")}\n\n— SkillPilot AI`,
+    `Difficulty: ${d.difficulty || "Beginner"} | Time: ${d.estimatedTime || "1-2 weeks"}\n\n` +
+    `${d.description || "A great starter project for 3MTT students."}\n\n` +
+    `Key Features:\n${(d.features || ["UI", "Basic logic", "Responsive"]).map(f => "• " + f).join("\n")}\n\n` +
+    `Technologies: ${(d.technologies || ["HTML", "CSS", "JavaScript"]).join(", ")}\n\n— SkillPilot AI`,
     "skillpilot-project.txt"
   );
 }
